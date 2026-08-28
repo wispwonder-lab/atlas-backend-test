@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlas — Backend Test</title>
+<style>
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; max-width:480px; margin:0 auto; padding:24px 16px; line-height:1.5; color:#1E293B; }
+  h1{ font-size:20px; }
+  label{ display:block; font-weight:600; margin-bottom:6px; }
+  input{ width:100%; min-height:44px; padding:10px; font-size:16px; border:1px solid #D1D5DB; border-radius:8px; box-sizing:border-box; }
+  button{ min-height:44px; padding:10px 20px; font-size:16px; font-weight:600; background:#2563EB; color:#fff; border:none; border-radius:8px; margin-top:12px; cursor:pointer; width:100%; }
+  button:disabled{ background:#93A6C9; }
+  .result{ margin-top:16px; padding:12px; border-radius:8px; }
+  .success{ background:#e9f8ee; border:1px solid #16A34A; color:#15803d; }
+  .error{ background:#fdecec; border:1px solid #DC2626; color:#b91c1c; }
+</style>
+</head>
+<body>
+<h1>Atlas — Backend Email Test</h1>
+<p>This sends one real test email through the new backend, to prove the connection to Resend genuinely works.</p>
+
+<label for="email">Send test email to</label>
+<input type="text" id="email" autocomplete="email">
+<button type="button" id="send-btn">Send test email</button>
+
+<div id="result"></div>
+
+<script>
+document.getElementById('send-btn').addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const resultEl = document.getElementById('result');
+  const btn = document.getElementById('send-btn');
+  resultEl.innerHTML = '';
+  if(!email){
+    resultEl.innerHTML = '<div class="result error">Please enter an email address first.</div>';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  try{
+    const response = await fetch('/api/send-test-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: email })
+    });
+    const data = await response.json();
+    btn.disabled = false; btn.textContent = 'Send test email';
+
+    if(!response.ok){
+      resultEl.innerHTML = '<div class="result error">Failed. Technical detail: ' + (data.error || 'Unknown error') + '</div>';
+      return;
+    }
+    resultEl.innerHTML = '<div class="result success">Sent successfully. Check the inbox for ' + email + '.</div>';
+  } catch(err){
+    btn.disabled = false; btn.textContent = 'Send test email';
+    resultEl.innerHTML = '<div class="result error">Something went wrong. Technical detail: ' + err.message + '</div>';
+  }
+});
+</script>
+</body>
+</html>
