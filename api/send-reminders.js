@@ -15,7 +15,15 @@ export default async function handler(req, res) {
   const querySecret = req.query.secret;
   const expected = 'Bearer ' + process.env.CRON_SECRET;
   if(authHeader !== expected && querySecret !== process.env.CRON_SECRET){
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({
+      error: 'Unauthorized',
+      debug: {
+        cronSecretIsSet: !!process.env.CRON_SECRET,
+        cronSecretLength: process.env.CRON_SECRET ? process.env.CRON_SECRET.length : 0,
+        querySecretReceivedLength: querySecret ? querySecret.length : 0,
+        querySecretReceived: querySecret || null
+      }
+    });
   }
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
