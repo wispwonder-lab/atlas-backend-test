@@ -81,7 +81,8 @@ export default async function handler(req, res) {
       });
 
       if(!sendResp.ok){
-        failed++; errors.push({ id: appt.id, error: 'Resend rejected the email' }); continue;
+        const sendErrorBody = await sendResp.json().catch(() => ({}));
+        failed++; errors.push({ id: appt.id, error: 'Resend rejected the email', detail: sendErrorBody }); continue;
       }
 
       const markResp = await fetch(SUPABASE_URL + '/rest/v1/appointments?id=eq.' + appt.id, {
