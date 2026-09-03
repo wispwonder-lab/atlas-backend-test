@@ -11,11 +11,26 @@ webpush.setVapidDetails(
 export default async function handler(req, res) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  // Protect this test endpoint with the existing CRON_SECRET.
+  const authHeader = req.headers.authorization;
+  const querySecret = req.query.secret;
+  const expected = 'Bearer ' + process.env.CRON_SECRET;
+
+  if (
+    authHeader !== expected &&
+    querySecret !== process.env.CRON_SECRET
+  ) {
+    return res.status(401).json({
+      error: 'Unauthorized'
+    });
+  }
+
   if (
     !serviceKey ||
     !process.env.VAPID_SUBJECT ||
     !process.env.VAPID_PUBLIC_KEY ||
-    !process.env.VAPID_PRIVATE_KEY
+    !process.env.VAPID_PRIVATE_KEY ||
+    !process.env.CRON_SECRET
   ) {
     return res.status(500).json({
       error: 'Required environment variables are not set.'
@@ -74,6 +89,7 @@ export default async function handler(req, res) {
       success: true,
       message: 'Push notification sent.'
     });
+
   } catch (error) {
     console.error('Push notification error:', error);
 
