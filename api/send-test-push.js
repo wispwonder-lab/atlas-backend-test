@@ -1,5 +1,7 @@
 import webpush from 'web-push';
 
+const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
+
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,
   process.env.VAPID_PUBLIC_KEY,
@@ -7,19 +9,58 @@ webpush.setVapidDetails(
 );
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const { subscription } = req.body || {};
-
-  if (!subscription || !subscription.endpoint || !subscription.keys) {
-    return res.status(400).json({
-      error: 'A valid push subscription is required.'
+  if (
+    !serviceKey ||
+    !process.env.VAPID_SUBJECT ||
+    !process.env.VAPID_PUBLIC_KEY ||
+    !process.env.VAPID_PRIVATE_KEY
+  ) {
+    return res.status(500).json({
+      error: 'Required environment variables are not set.'
     });
   }
 
   try {
+    const subscriptionResp = await fetch(
+      SUPABASE_URL
+        + '/rest/v1/push_subscriptions'
+        + '?select=id,endpoint,p256dh,auth_key,created_at'
+        + '&order=created_at.desc'
+        + '&limit=1',
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: 'Bearer ' + serviceKey
+        }
+      }
+    );
+
+    const subscriptions = await subscriptionResp.json();
+
+    if (!subscriptionResp.ok) {
+      return res.status(500).json({
+        error: 'Could not load push subscription.'
+      });
+    }
+
+    if (!subscriptions || subscriptions.length === 0) {
+      return res.status(404).json({
+        error: 'No push subscription found.'
+      });
+    }
+
+    const saved = subscriptions[0];
+
+    const subscription = {
+      endpoint: saved.endpoint,
+      keys: {
+        p256dh: saved.p256dh,
+        auth: saved.auth_key
+      }
+    };
+
     await webpush.sendNotification(
       subscription,
       JSON.stringify({
