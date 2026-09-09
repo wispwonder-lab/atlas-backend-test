@@ -1,11 +1,5 @@
 import webpush from 'web-push';
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
 const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
 
 export default async function handler(req, res) {
@@ -13,6 +7,31 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Check every required setting up front, with a real, specific error for
+  // whichever one is actually missing or malformed — never a hard crash.
+  const missing = [];
+  if (!process.env.VAPID_SUBJECT) missing.push('VAPID_SUBJECT');
+  if (!process.env.VAPID_PUBLIC_KEY) missing.push('VAPID_PUBLIC_KEY');
+  if (!process.env.VAPID_PRIVATE_KEY) missing.push('VAPID_PRIVATE_KEY');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (missing.length > 0) {
+    return res.status(500).json({ error: 'Missing required environment variables: ' + missing.join(', ') });
+  }
+  if (!/^mailto:|^https?:/.test(process.env.VAPID_SUBJECT)) {
+    return res.status(500).json({ error: 'VAPID_SUBJECT must start with "mailto:" or "https://". Current value starts with: ' + process.env.VAPID_SUBJECT.slice(0, 15) });
+  }
+
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT,
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  } catch (err) {
+    return res.status(500).json({ error: 'Could not set up push notifications with the current keys.', detail: err.message });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { practitionerUserId, title, body } = req.body || {};
