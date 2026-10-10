@@ -21,7 +21,7 @@ BEGIN
      OR p_start_date IS NULL
      OR p_end_date IS NULL
      OR p_end_date < p_start_date
-     OR p_end_date > p_start_date + 45 THEN
+     OR p_end_date > p_start_date + 90 THEN
     RAISE EXCEPTION 'Invalid availability request';
   END IF;
 
@@ -104,8 +104,10 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  IF p_appointment_date < CURRENT_DATE
-     OR p_appointment_date > CURRENT_DATE + 45 THEN
+  IF p_appointment_date < (now() AT TIME ZONE 'Africa/Johannesburg')::date
+     OR p_appointment_date > (now() AT TIME ZONE 'Africa/Johannesburg')::date + 90
+     OR (p_appointment_date = (now() AT TIME ZONE 'Africa/Johannesburg')::date
+         AND p_appointment_time <= (now() AT TIME ZONE 'Africa/Johannesburg')::time) THEN
     RAISE EXCEPTION 'The selected date is outside the booking window'
       USING ERRCODE = '22023';
   END IF;
