@@ -53,11 +53,21 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
+  -- Normalize nullable boolean inputs before any authorization or conflict checks.
+  p_is_emergency := COALESCE(p_is_emergency, false);
+  p_allow_overlap := COALESCE(p_allow_overlap, false);
+
   IF p_practice_id IS NULL OR p_location_id IS NULL OR p_practitioner_id IS NULL
      OR p_appointment_date IS NULL OR p_appointment_time IS NULL
      OR length(COALESCE(p_reason, '')) > 2000
      OR length(COALESCE(p_override_reason, '')) > 1000 THEN
     RAISE EXCEPTION 'Please check the booking details'
+      USING ERRCODE = '22023';
+  END IF;
+
+  IF p_appointment_date < (now() AT TIME ZONE 'Africa/Johannesburg')::date
+     OR p_appointment_date > (now() AT TIME ZONE 'Africa/Johannesburg')::date + 90 THEN
+    RAISE EXCEPTION 'The selected date is outside the permitted booking window'
       USING ERRCODE = '22023';
   END IF;
 
