@@ -159,6 +159,15 @@ export default async function handler(req, res) {
         }
       }
     }
+    if (sent === 0) {
+      // No delivery succeeded, so permit an authorized retry. If at least one
+      // subscription received it, keep the claim to avoid duplicate push spam.
+      await fetch(SUPABASE_URL + '/rest/v1/appointments?id=eq.' + encodeURIComponent(appointmentId), {
+        method: 'PATCH',
+        headers: { ...restHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancellation_notification_claimed_at: null })
+      });
+    }
     return res.status(200).json({ sent, failed });
   } catch {
     return res.status(500).json({ error: 'The push notification service encountered an error.' });
