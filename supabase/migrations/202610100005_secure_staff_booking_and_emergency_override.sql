@@ -107,12 +107,20 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
+  IF p_is_emergency AND (
+    NULLIF(btrim(p_reason), '') IS NULL
+    OR (v_role NOT IN ('receptionist', 'practice_administrator') AND NOT v_is_atlas_admin)
+  ) THEN
+    RAISE EXCEPTION 'An emergency booking requires an authorized staff role and a reason'
+      USING ERRCODE = '42501';
+  END IF;
+
   IF p_allow_overlap AND (
     NOT p_is_emergency
     OR NULLIF(btrim(p_override_reason), '') IS NULL
     OR (v_role NOT IN ('receptionist', 'practice_administrator') AND NOT v_is_atlas_admin)
   ) THEN
-    RAISE EXCEPTION 'An emergency override requires an authorized staff role and a reason'
+    RAISE EXCEPTION 'An emergency overlap override requires an authorized staff role and a reason'
       USING ERRCODE = '42501';
   END IF;
 
