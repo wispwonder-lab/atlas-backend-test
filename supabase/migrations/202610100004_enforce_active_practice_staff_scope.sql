@@ -200,8 +200,10 @@ USING (
     WHERE sr.user_id = auth.uid()
       AND sr.practice_id = practitioners.practice_id
       AND sr.is_active = true
-      AND (sr.location_id IS NULL OR sr.location_id = practitioners.location_id
-           OR (sr.role = 'practitioner' AND sr.practitioner_id = practitioners.id))
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = practitioners.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = practitioners.id)
+      )
   )
 );
 
