@@ -102,6 +102,23 @@ export default async function handler(req, res) {
     }
     webpush.setVapidDetails(vapidSubject, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
 
+    // Claim this cancellation atomically so repeated requests cannot spam the
+    // practitioner. The database migration adds this nullable claim column.
+    const claimResponse = await fetch(
+      SUPABASE_URL + '/rest/v1/appointments?id=eq.' + encodeURIComponent(appointmentId)
+        + '&status=eq.cancelled&cancellation_notification_claimed_at=is.null&select=id',
+      {
+        method: 'PATCH',
+        headers: { ...restHeaders, Prefer: 'return=representation', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancellation_notification_claimed_at: new Date().toISOString() })
+      }
+    );
+    const claimedRows = await claimResponse.json();
+    if (!claimResponse.ok) return res.status(500).json({ error: 'Could not claim the cancellation notification.' });
+    if (!Array.isArray(claimedRows) || claimedRows.length !== 1) {
+      return res.status(200).json({ sent: 0, alreadyProcessed: true });
+    }
+
     const patient = appointment.patients;
     const practitioner = appointment.practitioners;
     const patientName = [patient?.first_name, patient?.surname].filter(Boolean).join(' ') || 'A patient';
