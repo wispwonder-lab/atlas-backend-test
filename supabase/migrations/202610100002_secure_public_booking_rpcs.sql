@@ -138,6 +138,20 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
+  -- A free slot is bookable only if the full appointment fits inside the
+  -- practitioner's configured hours for that weekday (Postgres DOW: Sunday=0).
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.practitioner_availability AS av
+    WHERE av.practitioner_id = p_practitioner_id
+      AND av.day_of_week = EXTRACT(DOW FROM p_appointment_date)::integer
+      AND p_appointment_time >= av.start_time
+      AND p_appointment_time + make_interval(mins => v_duration) <= av.end_time
+  ) THEN
+    RAISE EXCEPTION 'The selected time is outside the practitioner''s available hours'
+      USING ERRCODE = '22023';
+  END IF;
+
   -- Serialize attempts for the same practitioner/date to close the concurrent
   -- booking race, then recheck interval overlap inside this transaction.
   PERFORM pg_catalog.pg_advisory_xact_lock(
