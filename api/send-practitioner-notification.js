@@ -56,6 +56,18 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: 'Only a cancelled appointment can trigger this notification.' });
     }
 
+    const practiceResponse = await fetch(
+      SUPABASE_URL + '/rest/v1/practices?id=eq.' + encodeURIComponent(appointment.practice_id) + '&select=id,account_status',
+      { headers: restHeaders }
+    );
+    const practices = await practiceResponse.json();
+    if (!practiceResponse.ok || !Array.isArray(practices)) {
+      return res.status(500).json({ error: 'Could not verify the practice status.' });
+    }
+    if (practices.length !== 1 || practices[0].account_status !== 'active') {
+      return res.status(403).json({ error: 'Notifications are disabled for this practice.' });
+    }
+
     const callerRolesResponse = await fetch(
       SUPABASE_URL + '/rest/v1/staff_roles?user_id=eq.' + encodeURIComponent(caller.id)
         + '&practice_id=eq.' + encodeURIComponent(appointment.practice_id)
