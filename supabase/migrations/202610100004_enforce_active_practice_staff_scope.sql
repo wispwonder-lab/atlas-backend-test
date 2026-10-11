@@ -152,7 +152,22 @@ USING (
 DROP POLICY IF EXISTS "Staff can view their practice's locations" ON public.locations;
 CREATE POLICY "Staff can view their practice's locations"
 ON public.locations FOR SELECT TO authenticated
-USING (public.is_active_staff_at(practice_id));
+USING (
+  public.is_active_staff_at(practice_id)
+  AND EXISTS (
+    SELECT 1 FROM public.staff_roles AS sr
+    WHERE sr.user_id = auth.uid()
+      AND sr.practice_id = locations.practice_id
+      AND sr.is_active = true
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = locations.id))
+        OR (sr.role = 'practitioner' AND EXISTS (
+          SELECT 1 FROM public.practitioners AS p
+          WHERE p.id = sr.practitioner_id AND p.location_id = locations.id
+        ))
+      )
+  )
+);
 
 DROP POLICY IF EXISTS "Staff can view availability for their scoped practitioners" ON public.practitioner_availability;
 CREATE POLICY "Staff can view availability for their scoped practitioners"
@@ -167,8 +182,10 @@ USING (
         WHERE sr.user_id = auth.uid()
           AND sr.practice_id = p.practice_id
           AND sr.is_active = true
-          AND (sr.location_id IS NULL OR sr.location_id = p.location_id
-               OR (sr.role = 'practitioner' AND sr.practitioner_id = p.id))
+          AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = p.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = p.id)
+      )
       )
   )
 );
@@ -198,7 +215,10 @@ WITH CHECK (
       AND sr.practice_id = queue_entries.practice_id
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = queue_entries.practitioner_id)
+      )
   )
 );
 
@@ -212,7 +232,10 @@ USING (
       AND sr.practice_id = queue_entries.practice_id
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = queue_entries.practitioner_id)
+      )
   )
 )
 WITH CHECK (
@@ -222,7 +245,10 @@ WITH CHECK (
       AND sr.practice_id = queue_entries.practice_id
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = queue_entries.practitioner_id)
+      )
   )
 );
 
@@ -236,7 +262,10 @@ USING (
       AND sr.practice_id = queue_entries.practice_id
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = queue_entries.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = queue_entries.practitioner_id)
+      )
   )
 );
 
@@ -244,14 +273,18 @@ DROP POLICY IF EXISTS "Staff can record override events at their practice" ON pu
 CREATE POLICY "Staff can record override events at their practice"
 ON public.queue_override_events FOR INSERT TO authenticated
 WITH CHECK (
-  EXISTS (
+  overridden_by = auth.uid()
+  AND EXISTS (
     SELECT 1 FROM public.queue_entries AS qe
     JOIN public.staff_roles AS sr ON sr.practice_id = qe.practice_id
     WHERE qe.id = queue_override_events.queue_entry_id
       AND sr.user_id = auth.uid()
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = qe.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = qe.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = qe.practitioner_id)
+      )
   )
 );
 
@@ -266,6 +299,9 @@ USING (
       AND sr.user_id = auth.uid()
       AND sr.is_active = true
       AND public.is_active_staff_at(sr.practice_id)
-      AND (sr.location_id IS NULL OR sr.location_id = qe.location_id)
+      AND (
+        (sr.role <> 'practitioner' AND (sr.location_id IS NULL OR sr.location_id = qe.location_id))
+        OR (sr.role = 'practitioner' AND sr.practitioner_id = qe.practitioner_id)
+      )
   )
 );
