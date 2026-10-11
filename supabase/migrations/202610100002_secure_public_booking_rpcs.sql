@@ -44,6 +44,7 @@ BEGIN
   FROM public.appointments AS a
   JOIN public.practitioners AS pr ON pr.id = a.practitioner_id
   WHERE a.practitioner_id = p_practitioner_id
+    AND a.practice_id = pr.practice_id
     AND a.appointment_date BETWEEN p_start_date AND p_end_date
     AND lower(COALESCE(a.status, 'booked')) NOT IN
         ('cancelled', 'canceled', 'no-show', 'noshow', 'completed');
