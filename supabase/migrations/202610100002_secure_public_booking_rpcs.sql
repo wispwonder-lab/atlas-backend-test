@@ -98,7 +98,7 @@ BEGIN
      OR length(btrim(p_first_name)) > 100
      OR length(btrim(p_surname)) > 100
      OR length(btrim(p_email)) > 254
-     OR btrim(p_email) !~* '^[A-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[A-Z0-9.-]+\\.[A-Z]{2,}     OR length(btrim(p_mobile_number)) > 40
+     OR btrim(p_email) !~* '^[A-Za-z0-9.!#$%&''*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$'
      OR length(COALESCE(p_reason, '')) > 2000
      OR (p_date_of_birth IS NOT NULL AND p_date_of_birth > CURRENT_DATE) THEN
     RAISE EXCEPTION 'Please check the booking details and try again'
