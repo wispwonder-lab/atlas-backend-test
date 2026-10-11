@@ -71,6 +71,11 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
+  IF p_is_emergency AND NULLIF(btrim(p_reason), '') IS NULL THEN
+    RAISE EXCEPTION 'An emergency booking requires a reason'
+      USING ERRCODE = '22023';
+  END IF;
+
   SELECT sr.role
     INTO v_role
   FROM public.staff_roles AS sr
@@ -138,6 +143,20 @@ BEGIN
   v_duration := COALESCE(v_duration, 30);
   IF v_duration < 1 OR v_duration > 480 THEN
     RAISE EXCEPTION 'The practitioner appointment duration is invalid'
+      USING ERRCODE = '22023';
+  END IF;
+
+  -- Ordinary staff bookings must fit configured hours. An explicitly marked
+  -- emergency may bypass hours, but still needs a reason and scoped permission.
+  IF NOT p_is_emergency AND NOT EXISTS (
+    SELECT 1
+    FROM public.practitioner_availability AS av
+    WHERE av.practitioner_id = p_practitioner_id
+      AND av.day_of_week = EXTRACT(DOW FROM p_appointment_date)::integer
+      AND p_appointment_time >= av.start_time
+      AND p_appointment_time + make_interval(mins => v_duration) <= av.end_time
+  ) THEN
+    RAISE EXCEPTION 'The selected time is outside the practitioner''s available hours'
       USING ERRCODE = '22023';
   END IF;
 
