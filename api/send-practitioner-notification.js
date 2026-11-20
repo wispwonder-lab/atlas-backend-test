@@ -81,7 +81,25 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ sent, failed, errors });
+    // A 2xx response means at least one push provider accepted the
+    // notification. If every device failed, return a failure status so the
+    // receptionist can report the problem instead of silently claiming success.
+    if (sent === 0 && failed > 0) {
+      return res.status(502).json({
+        sent,
+        failed,
+        message: 'The push service rejected the notification for every registered device.',
+        errors
+      });
+    }
+
+    return res.status(200).json({
+      sent,
+      failed,
+      message: failed > 0
+        ? 'The notification was accepted by some devices; at least one device failed.'
+        : 'The notification was accepted by all registered devices.'
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
