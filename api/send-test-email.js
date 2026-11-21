@@ -1,4 +1,9 @@
 export default async function handler(req, res) {
+  const expected = 'Bearer ' + process.env.CRON_SECRET;
+  if (!process.env.CRON_SECRET || req.headers.authorization !== expected) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
