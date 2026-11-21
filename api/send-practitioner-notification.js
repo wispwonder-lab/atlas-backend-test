@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       { headers }
     );
     const callerRoles = await callerResp.json();
-    if (!callerResp.ok) return res.status(500).json({ error: 'Could not verify your practice access.' });
+    if (!callerResp.ok) { console.error('Practitioner notification: caller practice-access lookup failed', { status: callerResp.status, response: callerRoles }); return res.status(500).json({ error: 'Could not verify your practice access.' }); }
 
     const targetResp = await fetch(
       SUPABASE_URL + '/rest/v1/staff_roles?user_id=eq.' + encodeURIComponent(practitionerUserId)
