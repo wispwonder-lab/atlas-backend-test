@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     const headers = { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey };
     const callerResp = await fetch(
       SUPABASE_URL + '/rest/v1/staff_roles?user_id=eq.' + encodeURIComponent(caller.id)
-      + '&is_active=eq.true&role=in.(receptionist,practice_administrator)&select=practice_id,location_id',
+      + '&is_active=eq.true&role=in.(receptionist,practice_administrator)&select=practice_id,location_id,role',
       { headers }
     );
     const callerRoles = await callerResp.json();
