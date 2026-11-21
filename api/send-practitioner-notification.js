@@ -5,7 +5,7 @@ const SUPABASE_URL = 'https://ppffrufhxitjpebkexjz.supabase.co';
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   // Check every required setting up front, with a real, specific error for
@@ -34,6 +34,19 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!accessToken) return res.status(401).json({ error: 'Authentication required.' });
+
+  const publicApiKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!publicApiKey) return res.status(500).json({ error: 'Supabase public API key is not configured.' });
+
+  const authResp = await fetch(SUPABASE_URL + '/auth/v1/user', {
+    headers: { apikey: publicApiKey, Authorization: 'Bearer ' + accessToken }
+  });
+  if (!authResp.ok) return res.status(401).json({ error: 'Your session is invalid or has expired.' });
+  const caller = await authResp.json();
+
   const { practitionerUserId, title, body } = req.body || {};
   if (!practitionerUserId || !title || !body) {
     return res.status(400).json({ error: 'practitionerUserId, title and body are required.' });
@@ -45,7 +58,46 @@ export default async function handler(req, res) {
   }
 
   try {
-    const listUrl = SUPABASE_URL + '/rest/v1/push_subscriptions?user_id=eq.' + practitionerUserId + '&select=endpoint,p256dh,auth_key';
+    const headers = { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey };
+    const callerResp = await fetch(
+      SUPABASE_URL + '/rest/v1/staff_roles?user_id=eq.' + encodeURIComponent(caller.id)
+      + '&is_active=eq.true&role=in.(receptionist,practice_administrator)&select=practice_id,location_id',
+      { headers }
+    );
+    const callerRoles = await callerResp.json();
+    if (!callerResp.ok) return res.status(500).json({ error: 'Could not verify your practice access.' });
+
+    const targetResp = await fetch(
+      SUPABASE_URL + '/rest/v1/staff_roles?user_id=eq.' + encodeURIComponent(practitionerUserId)
+      + '&role=eq.practitioner&is_active=eq.true&select=practice_id,practitioner_id',
+      { headers }
+    );
+    const targetRoles = await targetResp.json();
+    if (!targetResp.ok) return res.status(500).json({ error: 'Could not verify the practitioner account.' });
+
+    let authorized = false;
+    for (const target of targetRoles || []) {
+      if (!target.practitioner_id) continue;
+      const practitionerResp = await fetch(
+        SUPABASE_URL + '/rest/v1/practitioners?id=eq.' + encodeURIComponent(target.practitioner_id)
+        + '&select=practice_id,location_id&limit=1',
+        { headers }
+      );
+      const practitionerRows = await practitionerResp.json();
+      if (!practitionerResp.ok || !practitionerRows.length) continue;
+      const practitioner = practitionerRows[0];
+      if (practitioner.practice_id !== target.practice_id) continue;
+      if ((callerRoles || []).some(role =>
+        role.practice_id === target.practice_id
+        && (role.role === 'practice_administrator' || !role.location_id || role.location_id === practitioner.location_id)
+      )) {
+        authorized = true;
+        break;
+      }
+    }
+    if (!authorized) return res.status(403).json({ error: 'You are not authorized to notify this practitioner.' });
+
+    const listUrl = SUPABASE_URL + '/rest/v1/push_subscriptions?user_id=eq.' + encodeURIComponent(practitionerUserId) + '&select=endpoint,p256dh,auth_key';
     const listResp = await fetch(listUrl, {
       headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey }
     });
